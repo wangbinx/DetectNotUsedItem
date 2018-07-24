@@ -1,0 +1,18 @@
+https://vthsd.intel.com/hsd/tiano/tracker/default.aspx?tracker_id=223042
+
+[CCB 1375667] Create a Basetools Script to detect unreferenced PCD and GUID/Protocols/PPIs
+
+
++++++ lgao4 6/20/2018 2:04:45 AM
+
+This is a standalone script. It is used to scan Pcd/ Guid/Ppis/Protocols/LibraryClasses usage in INF file.
+
+Its input is one or more directory.
+1. It will find *.dec file. Then, parse them one by one. 
+2. For one dec, it will
+   1) Get LibraryClasses name from [LibraryClasses] section.
+   2) Get Guids/Ppis/Protocols GuidCName from [Guids]/ section.
+   3) Get Pcd Name from [PcdsFeatureFlag, PcdsFixedAtBuild, PcdsPatchableInModule, PcdsDynamic, PcdsDynamicEx] section.
+3. Scan them in all found INF files. 
+   1) If the one is in one line, and it is not in comments. It is regarded as the used one. The comment starts with '#'. 
+4. If the one is not used in any INF, report its name, line number and its DEC file. If --clean option is specified, the unused one and its comments will be removed from the DEC file. Its comments may be before its line or at the same line with it.
