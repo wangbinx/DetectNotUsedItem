@@ -1,3 +1,16 @@
+## @file
+# Detect unreferenced PCD and GUID/Protocols/PPIs.
+#
+# Copyright (c) 2018, Intel Corporation. All rights reserved.<BR>
+# This program and the accompanying materials
+# are licensed and made available under the terms and conditions of the BSD License
+# which accompanies this distribution.  The full text of the license may be found at
+# http://opensource.org/licenses/bsd-license.php
+#
+# THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
+# WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+#
+
 '''
 DetectNotUsedItem
 '''
@@ -10,7 +23,7 @@ import argparse
 # Globals for help information
 #
 __prog__        = 'DetectNotUsedItem'
-__version__     = '%s Version %s' % (__prog__, '0.1 ')
+__version__     = '%s Version %s' % (__prog__, '0.2 ')
 __copyright__   = 'Copyright (c) 2018, Intel Corporation. All rights reserved.'
 __description__ = "Detect unreferenced PCD and GUID/Protocols/PPIs.\n"
 
@@ -27,20 +40,20 @@ class Common(object):
 		return Files
 
 	# Parse Dec and Inf file to get Line number and Pcd Name
-	# return section name, the Pcdname and comments with there line number
+	# return section name, the Item Name and comments with there line number
 	def ParseContent(self,File):
 		SectionRE = re.compile(r'\[(.*)\]')
 		ParseFlag = False
 		Comments ={}
 		comment_num = []
 		SectionName = {}
-		Name = {}
+		ItemName = {}
 		with open(File, 'r') as F:
 			for num, value in enumerate(F):
 				Section = SectionRE.findall(value)
 				if Section and not (value.strip().startswith("#")):
 					section_name = Section[0]
-					ParseFlag= self._InFlag(section_name)
+					ParseFlag= self._InSectionFlag(section_name)
 					SectionName[num] = section_name
 					continue
 				if ParseFlag == True:
@@ -54,24 +67,23 @@ class Common(object):
 						comment_num.append(num)
 						if not value == "\n":
 							name = self._split(value)
-							Name[num] = name
+							ItemName[num] = name
 							Comments[name] = comment_num
 							comment_num = []
-		return SectionName, Name,Comments
+		return SectionName, ItemName,Comments
 
-	#Split the statement in Dec and Inf to get the PcdName
+	#Split the statement in Dec and Inf to get the ItemName
 	def _split(self,value):
 		return value.replace(' ','').split('=')[0].split('|')[0].split('#')[0].strip()
 
-	def _InFlag(self,name):
-		ParseFlag = False
-	#	section =''
-		ParsedSection = ["LibraryClasses", "Guids", "Ppis", "Protocols", "Pcd"]
-		for section_keyword in ParsedSection:
-			if section_keyword in name:
-				ParseFlag = True
-	#			section = name
-		return ParseFlag
+
+	def _InSectionFlag(self,name):
+		InFlag = False
+		ParsedSectionKeyWord = ["LibraryClasses", "Guids", "Ppis", "Protocols", "Pcd"]
+		for keyword in ParsedSectionKeyWord:
+			if keyword in name:
+				InFlag = True
+		return InFlag
 
 class PROCESS(Common):
 
@@ -99,41 +111,45 @@ class PROCESS(Common):
 
 	#Compare the LibraryClass/Guid/PcdCname in Dec and LibraryClass/Guid/PcdCname in Inf, if not equal, save the
 	#Pcd name, the Line number, and it's comments
-	def CheckPcd(self):
+	def CompareNamebetweenDecAndInf(self):
 		unuse ={}
-		DecSection, DecPcdName,DecComments = self.ParseDec()
+		DecSection, DecItem,DecComments = self.ParseDec()
 		InfsDict = self.ParseInfFile()
-		print("DEC File:\n%s"%self.Dec)
-		print("Line Number%sUnused Item"%(" "*5))
-		self.Log.append("DEC File:\n%s\nLine Number%sUnused PcdName\n"%(self.Dec,(" "*5)))
-		for LineNum in list(DecPcdName.keys()):
-			DecName = DecPcdName[LineNum]
+		for LineNum in list(DecItem.keys()):
+			DecItemName = DecItem[LineNum]
 			MatchFlag = False
 			for Inf in InfsDict:
 				Inf_dict = InfsDict[Inf]
-				Inf_section_dict, InfPcdName_dict = Inf_dict
-				for key in InfPcdName_dict.keys():
-					InfName = InfPcdName_dict[key]
-					if (DecName == InfName) or (DecName == InfName.split('.',1)[0]):
+				Inf_section, InfItem_dict = Inf_dict
+				for key in InfItem_dict.keys():
+					InfItemName = InfItem_dict[key]
+					if (DecItemName == InfItemName) or (DecItemName == InfItemName.split('.',1)[0]):
 						MatchFlag = True
 			if MatchFlag == False:
-				unuse[LineNum] = DecName
-				print("%s%s%s"%("{:>6}".format(LineNum+1)," "*12,DecName))
-				self.Log.append("%s%s%s\n"%("{:>6}".format(LineNum+1)," "*12,DecName))
-		self.Log.append("\n")
-		self.AppendSectionInfoToLog(DecSection,unuse)
+				unuse[LineNum] = DecItemName
+		self.LogClassify(DecSection,unuse)
 		return unuse,DecComments
 
-	def AppendSectionInfoToLog(self,DecSection,UnuseDict):
-		pass
+
+	def LogClassify(self,DecSection,UnuseDict):
+		# Set default length for output alignment
+		maxlen = 16
+		Dict = {}
 		for Name_num in list(UnuseDict.keys()):
 			section_list = list(sorted(DecSection.keys()))
 			for Section_num in section_list:
 				if Name_num < Section_num:
 					Section = DecSection[section_list[section_list.index(Section_num)-1]]
+					maxlen = max(maxlen,len(Section))
+					tmp =[UnuseDict[Name_num],Section]
+					Dict[Name_num] = tmp
 					break
-		pass
-
+		print("DEC File:\n%s\n%s%s%s" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
+		self.Log.append("DEC File:\n%s\n%s%s%s\n" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
+		for num in list(sorted(Dict.keys())):
+			ItemName,Section = Dict[num]
+			print("%s%s%s" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
+			self.Log.append("%s%s%s\n" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
 
 	#Clean the Pcd from Dec file which not used in Inf file.
 	#The origin Dec file will rename to DecFile.bak
@@ -153,18 +169,18 @@ class PROCESS(Common):
 						continue
 					else:
 						T.write(lines[linenum])
-			print("New Dec File Name:%s, origin Dec File Name:%s.bak"%(self.Dec,self.Dec))
+			print("New Dec File is %s, backup origin Dec to %s.bak"%(self.Dec,self.Dec))
 		except Exception as err:
 			print(err)
 
 class Main(object):
 
 	def mainprocess(self,Dec, Dirs, CleanFlag, LogPath):
-		R = PROCESS(Dec,Dirs)
-		unuse, comment = R.CheckPcd()
-		self.WriteLog(R.Log, LogPath)
+		run = PROCESS(Dec,Dirs)
+		unuse, comment = run.CompareNamebetweenDecAndInf()
+		self.WriteLog(run.Log, LogPath)
 		if CleanFlag:
-			R.Clean(unuse, comment)
+			run.Clean(unuse, comment)
 
 	# Function for Write log to log file.
 	def WriteLog(self,content, FileName):
@@ -183,7 +199,7 @@ def main():
 		                            description=__description__ + __copyright__,
 		                            conflict_handler='resolve')
 	parser.add_argument('-i', '--input', metavar="", dest='dec',help="Input DEC file path.")
-	parser.add_argument('--dirs', metavar="", action='append', dest='dirs', help="Input dir/dirs which include the INF file.")
+	parser.add_argument('--dirs', metavar="", action='append', dest='dirs', help="Input the package dir/dirs.")
 	parser.add_argument('--clean', action = 'store_true', default=False, dest='clean', help="Clean the unreferenced PCD from DEC file.")
 	parser.add_argument('--log', metavar="", dest="log", default=False,help="Export log to file")
 	options = parser.parse_args()
