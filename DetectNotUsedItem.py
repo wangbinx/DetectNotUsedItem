@@ -68,7 +68,7 @@ class Common(object):
 						if not value == "\n":
 							name = self._split(value)
 							ItemName[num] = name
-							Comments[name] = comment_num
+							Comments[num] = comment_num
 							comment_num = []
 		return SectionName, ItemName,Comments
 
@@ -113,7 +113,7 @@ class PROCESS(Common):
 	#Pcd name, the Line number, and it's comments
 	def CompareNamebetweenDecAndInf(self):
 		unuse ={}
-		DecSection, DecItem,DecComments = self.ParseDec()
+		DecSection, DecItem, DecComments = self.ParseDec()
 		InfsDict = self.ParseInfFile()
 		for LineNum in list(DecItem.keys()):
 			DecItemName = DecItem[LineNum]
@@ -156,9 +156,8 @@ class PROCESS(Common):
 	def Clean(self, UnUseDict, Comments):
 		removednum = []
 		for num in list(UnUseDict.keys()):
-			pcd = UnUseDict[num]
-			if pcd in list(Comments.keys()):
-				removednum += Comments[pcd]
+			if num in list(Comments.keys()):
+				removednum += Comments[num]
 		with open(self.Dec, 'r') as Dec:
 			lines = Dec.readlines()
 		shutil.copyfile(self.Dec,self.Dec+'.bak')
@@ -170,6 +169,25 @@ class PROCESS(Common):
 					else:
 						T.write(lines[linenum])
 			print("New Dec File is %s, backup origin Dec to %s.bak"%(self.Dec,self.Dec))
+		except Exception as err:
+			print(err)
+
+	def CleanTest(self, UnUseDict, commenttest):
+		removednum = []
+		for num in list(UnUseDict.keys()):
+			if num in list(commenttest.keys()):
+				removednum += commenttest[num][1]
+		with open(self.Dec, 'r') as Dec:
+			lines = Dec.readlines()
+		shutil.copyfile(self.Dec, self.Dec + '.bak')
+		try:
+			with open(self.Dec, 'w+') as T:
+				for linenum in range(len(lines)):
+					if linenum in removednum:
+						continue
+					else:
+						T.write(lines[linenum])
+			print("New Dec File is %s, backup origin Dec to %s.bak" % (self.Dec, self.Dec))
 		except Exception as err:
 			print(err)
 
