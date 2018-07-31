@@ -16,6 +16,7 @@ DetectNotUsedItem
 '''
 import re
 import os
+import sys
 import shutil
 import argparse
 
@@ -34,7 +35,7 @@ class Common(object):
 		for path in Path:
 			for root, dirs, files in os.walk(path, topdown=True, followlinks=False):
 				for name in files:
-					if os.path.splitext(name)[-1].lower() == '.%s' % ExtendName:
+					if name.endswith(ExtendName):
 						FullPath = os.path.join(root, name)
 						Files.append(FullPath)
 		return Files
@@ -133,23 +134,23 @@ class PROCESS(Common):
 
 	def LogClassify(self,DecSection,UnuseDict):
 		# Set default length for output alignment
-		maxlen = 16
+		minlen = 16
 		Dict = {}
 		for Name_num in list(UnuseDict.keys()):
 			section_list = list(sorted(DecSection.keys()))
 			for Section_num in section_list:
 				if Name_num < Section_num:
 					Section = DecSection[section_list[section_list.index(Section_num)-1]]
-					maxlen = max(maxlen,len(Section))
+					minlen = max(minlen,len(Section))
 					tmp =[UnuseDict[Name_num],Section]
 					Dict[Name_num] = tmp
 					break
-		print("DEC File:\n%s\n%s%s%s" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
-		self.Log.append("DEC File:\n%s\n%s%s%s\n" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
+		print("DEC File:\n%s\n%s%s%s" % (self.Dec, ("{:<%s}"%(minlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
+		self.Log.append("DEC File:\n%s\n%s%s%s\n" % (self.Dec, ("{:<%s}"%(minlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
 		for num in list(sorted(Dict.keys())):
 			ItemName,Section = Dict[num]
-			print("%s%s%s" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
-			self.Log.append("%s%s%s\n" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
+			print("%s%s%s" % (("{:<%s}"%(minlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
+			self.Log.append("%s%s%s\n" % (("{:<%s}"%(minlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
 
 	#Clean the Pcd from Dec file which not used in Inf file.
 	#The origin Dec file will rename to DecFile.bak
@@ -172,28 +173,16 @@ class PROCESS(Common):
 		except Exception as err:
 			print(err)
 
-	def CleanTest(self, UnUseDict, commenttest):
-		removednum = []
-		for num in list(UnUseDict.keys()):
-			if num in list(commenttest.keys()):
-				removednum += commenttest[num][1]
-		with open(self.Dec, 'r') as Dec:
-			lines = Dec.readlines()
-		shutil.copyfile(self.Dec, self.Dec + '.bak')
-		try:
-			with open(self.Dec, 'w+') as T:
-				for linenum in range(len(lines)):
-					if linenum in removednum:
-						continue
-					else:
-						T.write(lines[linenum])
-			print("New Dec File is %s, backup origin Dec to %s.bak" % (self.Dec, self.Dec))
-		except Exception as err:
-			print(err)
-
 class Main(object):
 
-	def mainprocess(self,Dec, Dirs, CleanFlag, LogPath):
+	def mainprocess(self, Dec, Dirs, CleanFlag, LogPath):
+		if not (os.path.exists(Dec) and Dec.endswith(".dec")):
+			print("ERROR:Invalid DEC file input: %s"%Dec)
+			sys.exit(1)
+		for  dir in Dirs:
+			if not os.path.exists(dir):
+				print("ERROR:Invalid DIR for '--dirs': %s"%dir)
+				sys.exit(1)
 		run = PROCESS(Dec,Dirs)
 		unuse, comment = run.CompareNamebetweenDecAndInf()
 		self.WriteLog(run.Log, LogPath)
@@ -204,6 +193,12 @@ class Main(object):
 	def WriteLog(self,content, FileName):
 		if FileName != False:
 			try:
+				#if Filename is a path, create path
+				if "\\" in FileName:
+					List = FileName.split('\\')
+					FilePath = "\\".join(List[:-1])
+					if not os.path.exists(FilePath):
+						os.makedirs(FilePath)
 				with open(FileName, 'w+') as log:
 					for line in content:
 						log.write(line)
