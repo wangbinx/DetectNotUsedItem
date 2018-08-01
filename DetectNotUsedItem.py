@@ -51,21 +51,16 @@ class Common(object):
 		ItemName = {}
 		with open(File, 'r') as F:
 			for num, value in enumerate(F):
+				NotComment = not value.strip().startswith("#")
 				Section = SectionRE.findall(value)
-				if Section and not (value.strip().startswith("#")):
+				if Section and NotComment:
 					section_name = Section[0]
 					ParseFlag= self._InSectionFlag(section_name)
 					SectionName[num] = section_name
 					continue
 				if ParseFlag == True:
-					if value.strip().startswith("#"):
-						CommentsFlag = True
-					else:
-						CommentsFlag = False
-					if CommentsFlag:
-						comment_num.append(num)
-					if not (value.strip().startswith("#")):
-						comment_num.append(num)
+					comment_num.append(num)
+					if NotComment:
 						if not value == "\n":
 							name = self._split(value)
 							ItemName[num] = name
@@ -131,7 +126,6 @@ class PROCESS(Common):
 		self.LogClassify(DecSection,unuse)
 		return unuse,DecComments
 
-
 	def LogClassify(self,DecSection,UnuseDict):
 		# Set default length for output alignment
 		minlen = 16
@@ -193,10 +187,9 @@ class Main(object):
 	def WriteLog(self,content, FileName):
 		if FileName != False:
 			try:
-				#if Filename is a path, create path
-				if "\\" in FileName:
-					List = FileName.split('\\')
-					FilePath = "\\".join(List[:-1])
+				#if Filename include path, create path
+				if os.path.sep in FileName:
+					FilePath = os.path.dirname(FileName)
 					if not os.path.exists(FilePath):
 						os.makedirs(FilePath)
 				with open(FileName, 'w+') as log:
