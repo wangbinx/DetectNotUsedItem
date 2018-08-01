@@ -61,7 +61,7 @@ class Common(object):
 				if ParseFlag == True:
 					comment_num.append(num)
 					if NotComment:
-						if not value == "\n":
+						if value != "\n" and value != "\r\n":
 							name = self._split(value)
 							ItemName[num] = name
 							Comments[num] = comment_num
