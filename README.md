@@ -1,15 +1,16 @@
-usage: GenerateUnreferencedPcd [-h] [-v] [-i] [--clean]
+usage: DetectNotUsedItem [-h] [-i] [--dirs] [--clean] [--log]
 
-Generate all Unreferenced Pcd in Dec File, echo the DEC file, the pcd name and
-it's line number. Copyright (c) 2016 - 2018, Intel Corporation. All rights
-reserved.
+Detect unreferenced PCD and GUID/Protocols/PPIs. Copyright (c) 2018, Intel
+Corporation. All rights reserved.
 
 optional arguments:
 
-  -h, --help         show this help message and exit
+  -h,  --help             show this help message and exit
   
-  -v, --version   show program's version number and exit
+  -i , --input            Input DEC file name.
   
-  -i , --input        Input the package path,e.g. C:\MyWorkSpace\Nt32Pkg
-  
-  --clean             Clean the Unreferenced PCD from DEC file
+  --dirs                  The package directory. To specify more directories, please
+                          repeat this option.
+						  
+  --clean                 Clean the unreferenced items from DEC file.
+  --log                   Put log in specified file as well as on console.
