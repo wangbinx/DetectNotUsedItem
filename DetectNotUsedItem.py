@@ -24,7 +24,7 @@ import argparse
 # Globals for help information
 #
 __prog__        = 'DetectNotUsedItem'
-__version__     = '%s Version %s' % (__prog__, '0.2 ')
+__version__     = '%s Version %s' % (__prog__, '0.22')
 __copyright__   = 'Copyright (c) 2018, Intel Corporation. All rights reserved.'
 __description__ = "Detect unreferenced PCD and GUID/Protocols/PPIs.\n"
 
@@ -38,14 +38,15 @@ class PROCESS(object):
 		self.Log = []
 
 	def ParseDec(self):
-		return self.ParseContent(self.Dec)
+		return self.ParseDecContent(self.Dec)
 
-	def ParseInfFile(self):
-		INF_Dict ={}
-		for inf in self.SearchbyExt(".inf"):
-			INF_Dict[inf] = self.ParseContent(inf)
-		return INF_Dict
+	def ParserDscFdfInfFile(self):
+		AllContentList = []
+		for File in (self.SearchbyExt(".dsc")+self.SearchbyExt(".fdf")+self.SearchbyExt(".inf")):
+			AllContentList += self.ParseDscFdfInfContent(File)
+		return AllContentList
 
+	#Search File by extension name
 	def SearchbyExt(self, Ext):
 		FileList = []
 		for path in self.InfPath:
@@ -55,9 +56,9 @@ class PROCESS(object):
 						FileList.append(os.path.join(root, filename))
 		return FileList
 
-	# Parse DEC or INF file to get Line number and Name
+	# Parse DEC file to get Line number and Name
 	# return section name, the Item Name and comments line number
-	def ParseContent(self, File):
+	def ParseDecContent(self, File):
 		SectionRE = re.compile(r'\[(.*)\]')
 		Flag = False
 		Comments ={}
@@ -88,25 +89,35 @@ class PROCESS(object):
 				return True
 		return False
 
+	#Parse DSC, FDF, INF File, remove comments, return Lines list
+	def ParseDscFdfInfContent(self,File):
+		with open(File,'r') as F:
+			lines = F.readlines()
+		for Index in range(len(lines)-1,-1,-1):
+			if lines[Index].strip().startswith("#") or lines[Index] == "\n":
+				lines.remove(lines[Index])
+			elif "#" in lines[Index]:
+				lines[Index] = lines[Index].split("#")[0].strip()
+			else:
+				lines[Index] = lines[Index].strip()
+		return lines
+
 	def DetectNotUsedItem(self):
 		NotUsedItem = {}
 		DecSection, DecItem, DecComments = self.ParseDec()
-		InfsDict = self.ParseInfFile()
+		InfDscFdfContent = self.ParserDscFdfInfFile()
 		for LineNum in list(DecItem.keys()):
 			DecItemName = DecItem[LineNum]
+			Match_reg = re.compile("(?<![a-zA-Z0-9])%s(?![a-zA-Z0-9])" % DecItemName)
 			MatchFlag = False
-			for Inf in InfsDict:
-				InfItem_dict = InfsDict[Inf][1]
-				for key in InfItem_dict.keys():
-					InfItemName = InfItem_dict[key]
-					if (DecItemName == InfItemName) or (DecItemName == InfItemName.split('.',1)[0]):
-						MatchFlag = True
-						break
+			for Line in InfDscFdfContent:
+				if Match_reg.search(Line):
+					MatchFlag = True
+					break
 			if not MatchFlag:
 				NotUsedItem[LineNum] = DecItemName
 		self.Display(DecSection, NotUsedItem)
 		return NotUsedItem, DecComments
-
 
 	def Display(self, DecSection, UnuseDict):
 		# Set default length for output alignment
@@ -135,7 +146,6 @@ class PROCESS(object):
 				removednum += Comments[num]
 		with open(self.Dec, 'r') as Dec:
 			lines = Dec.readlines()
-		shutil.copyfile(self.Dec, self.Dec+'.bak')
 		try:
 			with open(self.Dec, 'w+') as T:
 				for linenum in range(len(lines)):
@@ -143,7 +153,7 @@ class PROCESS(object):
 						continue
 					else:
 						T.write(lines[linenum])
-			print("New DEC File is %s, backup origin DEC to %s.bak"%(self.Dec,self.Dec))
+			print("DEC File has been clean: %s"%(self.Dec))
 		except Exception as err:
 			print(err)
 
@@ -156,9 +166,9 @@ class Main(object):
 				sys.exit(1)
 		Pa = PROCESS(Dec, Dirs)
 		unuse, comment = Pa.DetectNotUsedItem()
-		self.Logging(Pa.Log, LogPath)
 		if Isclean:
 			Pa.Clean(unuse, comment)
+		self.Logging(Pa.Log, LogPath)
 
 	def Logging(self, content, LogPath):
 		if LogPath:
