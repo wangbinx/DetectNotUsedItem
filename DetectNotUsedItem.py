@@ -24,7 +24,7 @@ import argparse
 # Globals for help information
 #
 __prog__        = 'DetectNotUsedItem'
-__version__     = '%s Version %s' % (__prog__, '0.22')
+__version__     = '%s Version %s' % (__prog__, '0.23')
 __copyright__   = 'Copyright (c) 2018, Intel Corporation. All rights reserved.'
 __description__ = "Detect unreferenced PCD and GUID/Protocols/PPIs.\n"
 
@@ -36,9 +36,6 @@ class PROCESS(object):
 		self.Dec = DecPath
 		self.InfPath = InfDirs
 		self.Log = []
-
-	def ParseDec(self):
-		return self.ParseDecContent(self.Dec)
 
 	def ParserDscFdfInfFile(self):
 		AllContentList = []
@@ -58,22 +55,18 @@ class PROCESS(object):
 
 	# Parse DEC file to get Line number and Name
 	# return section name, the Item Name and comments line number
-	def ParseDecContent(self, File):
+	def ParseDecContent(self):
 		SectionRE = re.compile(r'\[(.*)\]')
 		Flag = False
 		Comments ={}
 		Comment_Line = []
-		SectionName = {}
 		ItemName = {}
-		with open(File, 'r') as F:
+		with open(self.Dec, 'r') as F:
 			for Index, content in enumerate(F):
 				NotComment = not content.strip().startswith("#")
 				Section = SectionRE.findall(content)
 				if Section and NotComment:
 					Flag = self.IsNeedParseSection(Section[0])
-					if Flag:
-						SectionName[Index] = Section[0]
-					continue
 				if Flag:	
 					Comment_Line.append(Index)
 					if NotComment:
@@ -81,7 +74,7 @@ class PROCESS(object):
 							ItemName[Index] = content.split('=')[0].split('|')[0].split('#')[0].strip()
 							Comments[Index] = Comment_Line
 							Comment_Line = []
-		return SectionName, ItemName, Comments
+		return ItemName, Comments
 
 	def IsNeedParseSection(self, SectionName):
 		for item in SectionList:
@@ -104,7 +97,7 @@ class PROCESS(object):
 
 	def DetectNotUsedItem(self):
 		NotUsedItem = {}
-		DecSection, DecItem, DecComments = self.ParseDec()
+		DecItem, DecComments = self.ParseDecContent()
 		InfDscFdfContent = self.ParserDscFdfInfFile()
 		for LineNum in list(DecItem.keys()):
 			DecItemName = DecItem[LineNum]
@@ -116,28 +109,16 @@ class PROCESS(object):
 					break
 			if not MatchFlag:
 				NotUsedItem[LineNum] = DecItemName
-		self.Display(DecSection, NotUsedItem)
+		self.Display(NotUsedItem)
 		return NotUsedItem, DecComments
 
-	def Display(self, DecSection, UnuseDict):
-		# Set default length for output alignment
-		maxlen = 16
-		Dict = {}
-		for Name_num in list(UnuseDict.keys()):
-			section_list = list(sorted(DecSection.keys()))
-			for Section_num in section_list:
-				if Name_num < Section_num:
-					Section = DecSection[section_list[section_list.index(Section_num)-1]]
-					maxlen = max(maxlen,len(Section))
-					tmp =[UnuseDict[Name_num],Section]
-					Dict[Name_num] = tmp
-					break
-		print("DEC File:\n%s\n%s%s%s" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
-		self.Log.append("DEC File:\n%s\n%s%s%s\n" % (self.Dec, ("{:<%s}"%(maxlen-1)).format("Section Name"), "{:<15}".format("Line Number"), "{:<0}".format("Unused Item")))
-		for num in list(sorted(Dict.keys())):
-			ItemName, Section = Dict[num]
-			print("%s%s%s" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
-			self.Log.append("%s%s%s\n" % (("{:<%s}"%(maxlen+2)).format(Section), "{:<12}".format(num + 1), "{:<1}".format(ItemName)))
+	def Display(self,UnuseDict):
+		print("DEC File:\n%s\n%s%s" % (self.Dec, "{:<15}".format("Line Number"),"{:<0}".format("Unused Item")))
+		self.Log.append("DEC File:\n%s\n%s%s\n" % (self.Dec, "{:<15}".format("Line Number"),"{:<0}".format("Unused Item")))
+		for num in list(sorted(UnuseDict.keys())):
+			ItemName = UnuseDict[num]
+			print("%s%s%s" % (" "*3,"{:<12}".format(num + 1), "{:<1}".format(ItemName)))
+			self.Log.append(("%s%s%s\n" % (" "*3,"{:<12}".format(num + 1), "{:<1}".format(ItemName))))
 
 	def Clean(self, UnUseDict, Comments):
 		removednum = []
