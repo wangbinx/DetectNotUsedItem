@@ -87,7 +87,7 @@ class PROCESS(object):
 		with open(File,'r') as F:
 			lines = F.readlines()
 		for Index in range(len(lines)-1,-1,-1):
-			if lines[Index].strip().startswith("#") or lines[Index] == "\n":
+			if lines[Index].strip().startswith("#") or lines[Index] == "\n" or lines[Index] == "\r\n":
 				lines.remove(lines[Index])
 			elif "#" in lines[Index]:
 				lines[Index] = lines[Index].split("#")[0].strip()
@@ -101,7 +101,7 @@ class PROCESS(object):
 		InfDscFdfContent = self.ParserDscFdfInfFile()
 		for LineNum in list(DecItem.keys()):
 			DecItemName = DecItem[LineNum]
-			Match_reg = re.compile("(?<![a-zA-Z0-9])%s(?![a-zA-Z0-9])" % DecItemName)
+			Match_reg = re.compile("(?<![a-zA-Z0-9_-])%s(?![a-zA-Z0-9_-])" % DecItemName)
 			MatchFlag = False
 			for Line in InfDscFdfContent:
 				if Match_reg.search(Line):
